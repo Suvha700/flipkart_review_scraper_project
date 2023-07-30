@@ -5,9 +5,8 @@ from bs4 import BeautifulSoup as bs
 from urllib.request import urlopen as uReq
 import pymongo
 
-application = Flask(__name__) # initializing a flask app
+application= Flask(__name__) # initializing a flask app
 app=application
-
 @app.route('/',methods=['GET'])  # route to display the home page
 @cross_origin()
 def homePage():
@@ -27,54 +26,85 @@ def index():
             bigboxes = flipkart_html.findAll("div", {"class": "_1AtVbE col-12-12"})
             del bigboxes[0:3]
             box = bigboxes[0]
-            productLink = "https://www.flipkart.com" + box.div.div.div.a['href']
+            productLink="https://www.flipkart.com" + box.div.div.div.a['href']
             prodRes = requests.get(productLink)
             prodRes.encoding='utf-8'
+
             prod_html = bs(prodRes.text, "html.parser")
-            print(prod_html)
-            commentboxes = prod_html.find_all('div', {'class': "_16PBlm"})
+            k=prod_html.find("div",{"class":"col JOpGWq"}).find_all("a")[-1]
+            m_pg="https://www.flipkart.com" + k["href"]
+            prodRes1 = requests.get(m_pg)
+            pd_box1 = bs(prodRes1.text, "html.parser")
+            pg_link="https://www.flipkart.com" + pd_box1.find("div",{"class":"_2MImiq _1Qnn1K"}).a["href"][:-1]
+            all_pg=[]
+            for i in range(1,6):
+                ll=(pg_link + str(i))
+                all_pg.append(ll)
+            pd_com = []
+            pd_review = []
+            pd_head = []  # Initialize as an empty list
+            pd_rat = []
+            revewer_name = []
+            reviews = []  # List to store all the dictionaries
 
-            filename = searchString + ".csv"
-            fw = open(filename, "w")
-            headers = "Product, Customer Name, Rating, Heading, Comment \n"
-            fw.write(headers)
-            reviews = []
-            for commentbox in commentboxes:
+            for j in all_pg:
+                prodRes5 = requests.get(j)
+                n_pg_html = bs(prodRes5.text, "html.parser")
+                pd_box = n_pg_html.find_all("div", {"class": "col _2wzgFH K0kLPL"})
+
                 try:
-                    #name.encode(encoding='utf-8')
-                    name = commentbox.div.div.find_all('p', {'class': '_2sc7ZR _2V5EHH'})[0].text
+                    for i in pd_box:
+                        pd_review.append(i.p.text)
 
-                except:
-                    name = 'No Name'
+                except Exception as f:
+                    print(f)
 
-                try:
-                    #rating.encode(encoding='utf-8')
-                    rating = commentbox.div.div.div.div.text
-
-
-                except:
-                    rating = 'No Rating'
+            
 
                 try:
                     #commentHead.encode(encoding='utf-8')
-                    commentHead = commentbox.div.div.div.p.text
-
+                    for i in pd_box:
+                        pd_head.append(i.div.div.div.p)
                 except:
-                    commentHead = 'No Comment Heading'
-                try:
-                    comtag = commentbox.div.div.find_all('div', {'class': ''})
-                    #custComment.encode(encoding='utf-8')
-                    custComment = comtag[0].div.text
-                except Exception as e:
-                    print("Exception while creating dictionary: ",e)
+                    pd_head = 'No Comment Heading'
 
-                mydict = {"Product": searchString, "Name": name, "Rating": rating, "CommentHead": commentHead,
-                          "Comment": custComment}
-                reviews.append(mydict)
-            client = pymongo.MongoClient("mongodb+srv://pwskills:pwskills@cluster0.ln0bt5m.mongodb.net/?retryWrites=true&w=majority")
-            db = client['review_scrap']
-            review_col = db['review_scrap_data']
-            review_col.insert_many(reviews)
+                try:
+                    for i in pd_box:
+                        pd_com.append(i.find("div", {"class": "t-ZTKy"}).text)
+                except Exception as f:
+                    print(f)
+
+                try:
+                    for i in pd_box:
+                        pd_rat.append(i.div.find("div").text)
+                except Exception as f:
+                    print(f)
+
+                try:
+                    for i in pd_box:
+                        revewer_name.append(i.find("p", {"class": "_2sc7ZR _2V5EHH"}).text)
+                except Exception as f:
+                    print(f)
+
+                # Loop through the lists and create a dictionary for each set of data
+                for idx in range(len(pd_review)):
+                    mydict = {
+                        # You need to define 'searchString' somewhere in your code
+                        "Customer Name": revewer_name[idx],
+                        "Rating": pd_rat[idx],
+                        "Comment": pd_com[idx],
+                        "Review": pd_review[idx],
+                        'prodact name': searchString
+                    
+                    }
+                    reviews.append(mydict)
+            print(reviews)
+            
+
+            #client = pymongo.MongoClient("mongodb+srv://sabyasachi:sabyasachi@cluster0.ln0bt5m.mongodb.net/?retryWrites=true&w=majority")
+            #db = client['review_scrap']
+            #review_col = db['review_scrap_data']
+            #review_col.insert_many(reviews)
             return render_template('results.html', reviews=reviews[0:(len(reviews)-1)])
         except Exception as e:
             print('The Exception message is: ',e)
@@ -85,5 +115,5 @@ def index():
         return render_template('index.html')
 
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=8000, debug=True)
+    app.run(host='127.0.0.1', port=8000)
 	#app.run(debug=True)
